@@ -2,9 +2,10 @@ import streamlit as st
 import hashlib
 import time
 import json
+import pandas as pd
 
 # --- Page Configuration & Glassmorphism CSS ---
-st.set_page_config(page_title="AUM Blockchain Explorer", layout="wide")
+st.set_page_config(page_title="AUM Blockchain Explorer", layout="wide", page_icon="💠")
 
 st.markdown("""
 <style>
@@ -17,7 +18,7 @@ st.markdown("""
         color: #e2e8f0;
     }
     
-    /* Headers */
+    /* Headers and Text */
     h1, h2, h3 { color: #38bdf8 !important; }
     
     /* Glassmorphism Metrics Cards */
@@ -40,6 +41,7 @@ st.markdown("""
         color: white !important;
         border-radius: 10px !important;
         transition: all 0.3s ease !important;
+        width: 100%;
     }
     div.stButton > button:hover {
         border-color: #38bdf8 !important;
@@ -55,11 +57,15 @@ st.markdown("""
         padding: 20px;
     }
     
-    /* Expanders (Blockchain Explorer) */
-    div[data-testid="stExpander"] {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 10px !important;
+    /* Tabs Styling */
+    button[data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: #94a3b8 !important;
+        font-size: 1.1rem !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #38bdf8 !important;
+        border-bottom-color: #38bdf8 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -151,85 +157,145 @@ class AUMBlockchain:
                 return False
         return True
 
-# --- Streamlit GUI ---
-st.title("💠 AUM Blockchain Network")
-st.caption("Live Sharded Proof-of-Work Demo | Developed by @0xSturdy")
-
-# Initialize Blockchain in Session State
+# --- Initialize Blockchain in Session State ---
 if 'blockchain' not in st.session_state:
     st.session_state.blockchain = AUMBlockchain()
 
 bc = st.session_state.blockchain
 
-# --- Tokenomics Dashboard ---
-st.subheader("📊 Network Statistics")
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Total Max Supply", f"{bc.total_supply:,.0f} AUM")
-with col2:
-    st.metric("Mined / Circulating", f"{bc.current_supply:,.2f} AUM")
-with col3:
-    available = bc.total_supply - bc.current_supply
-    st.metric("Available to Mine", f"{available:,.2f} AUM")
+# --- Main App Title ---
+st.title("💠 AUM Network")
+st.caption("Live Sharded Proof-of-Work Demo | Developed by @0xSturdy")
 
-st.divider()
+# --- Tabs Navigation ---
+tab1, tab2 = st.tabs(["🏦 Wallet & Network Controls", "🔍 AUMscan (Explorer)"])
 
-# --- Main Interaction Area ---
-left_col, right_col = st.columns([1, 1])
+# ==========================================
+# TAB 1: WALLET & NETWORK CONTROLS
+# ==========================================
+with tab1:
+    st.subheader("📊 Tokenomics Dashboard")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Max Supply", f"{bc.total_supply:,.0f} AUM")
+    with col2:
+        st.metric("Mined / Circulating", f"{bc.current_supply:,.2f} AUM")
+    with col3:
+        available = bc.total_supply - bc.current_supply
+        st.metric("Available to Mine", f"{available:,.2f} AUM")
 
-with left_col:
-    st.subheader("💸 Send Transaction")
-    with st.form(key="tx_form"):
-        sender = st.text_input("Sender Wallet", value="Client_Wallet_0x1")
-        recipient = st.text_input("Recipient Wallet", value="Akshay_0x2")
-        amount = st.number_input("Amount (AUM)", value=100.0, min_value=0.1)
-        submit_tx = st.form_submit_button("Sign & Send Transaction")
-        
-        if submit_tx:
-            bc.add_transaction(sender, recipient, amount)
-            st.success("✅ Transaction added to mempool!")
+    st.divider()
 
-with right_col:
-    st.subheader("⛏️ Network Controls")
-    st.write(f"**Pending Transactions:** {len(bc.pending_transactions)}")
-    st.write(f"**Current Difficulty:** {bc.difficulty}")
-    
-    if st.button("⛏️ Mine Pending Blocks (PoW)"):
-        with st.spinner("Cryptographic hashing in progress..."):
-            result = bc.mine_block()
-            st.success(result)
-            st.rerun() # Refresh stats
+    left_col, right_col = st.columns([1, 1])
+
+    with left_col:
+        st.subheader("💸 Send Transaction")
+        with st.form(key="tx_form"):
+            sender = st.text_input("Sender Wallet", value="0xClientWallet...")
+            recipient = st.text_input("Recipient Wallet", value="0xAkshay...")
+            amount = st.number_input("Amount (AUM)", value=100.0, min_value=0.1)
+            submit_tx = st.form_submit_button("Sign & Send Transaction")
             
-    if st.button("🛡️ Validate Ledger Integrity"):
-        valid = bc.is_chain_valid()
-        if valid:
-            st.success("✅ Cryptographic validation passed. Chain is secure.")
-        else:
-            st.error("🚨 Warning: Chain data has been tampered with!")
+            if submit_tx:
+                bc.add_transaction(sender, recipient, amount)
+                st.success("✅ Transaction added to mempool! Switch to Network Controls to mine.")
 
-    if st.button("🔄 Reset Network"):
-        st.session_state.blockchain = AUMBlockchain()
-        st.success("Network reset to Genesis Block!")
-        st.rerun()
-
-st.divider()
-
-# --- Blockchain Explorer ---
-st.subheader("🔍 AUM Blockchain Explorer")
-st.write("Inspect individual blocks, shards, and transactions below.")
-
-# Display blocks in reverse order (newest first)
-for block in reversed(bc.chain):
-    with st.expander(f"📦 Block #{block.index} | Shard: {block.shard_id} | Hash: {block.hash[:15]}..."):
-        ex_col1, ex_col2 = st.columns(2)
-        with ex_col1:
-            st.write(f"**Timestamp:** {time.ctime(block.timestamp)}")
-            st.write(f"**Nonce:** {block.nonce}")
-        with ex_col2:
-            st.write(f"**Previous Hash:**")
-            st.code(block.previous_hash, language="text")
-            st.write(f"**Block Hash:**")
-            st.code(block.hash, language="text")
+    with right_col:
+        st.subheader("⛏️ Network Controls")
+        st.write(f"**Pending Transactions in Mempool:** {len(bc.pending_transactions)}")
+        st.write(f"**Current Network Difficulty:** {bc.difficulty}")
         
-        st.write("**Transactions in this block:**")
-        st.json(block.transactions)
+        if st.button("⛏️ Mine Pending Blocks (PoW)"):
+            with st.spinner("Cryptographic hashing in progress..."):
+                result = bc.mine_block()
+                st.success(result)
+                st.rerun() 
+                
+        if st.button("🛡️ Validate Ledger Integrity"):
+            valid = bc.is_chain_valid()
+            if valid:
+                st.success("✅ Cryptographic validation passed. Chain is secure.")
+            else:
+                st.error("🚨 Warning: Chain data has been tampered with!")
+
+        if st.button("🔄 Reset Network"):
+            st.session_state.blockchain = AUMBlockchain()
+            st.success("Network reset to Genesis Block!")
+            st.rerun()
+
+
+# ==========================================
+# TAB 2: AUMscan (BLOCKCHAIN EXPLORER)
+# ==========================================
+with tab2:
+    st.header("🔍 AUMscan")
+    
+    # Calculate total transactions across the whole chain
+    total_txns = sum(len(b.transactions) for b in bc.chain)
+    
+    # Explorer High-Level Stats
+    ex_col1, ex_col2, ex_col3, ex_col4 = st.columns(4)
+    ex_col1.metric("Block Height", len(bc.chain) - 1)
+    ex_col2.metric("Total Transactions", total_txns)
+    ex_col3.metric("Active Shards", bc.shard_count)
+    ex_col4.metric("Network Status", "🟢 Online")
+    
+    st.divider()
+    
+    # --- Etherscan Style Tables ---
+    table_col1, table_col2 = st.columns([1, 1])
+    
+    with table_col1:
+        st.subheader("📦 Latest Blocks")
+        # Prepare data for the DataFrame
+        block_data = []
+        for b in reversed(bc.chain):
+            block_data.append({
+                "Block": b.index,
+                "Age (UTC)": time.strftime('%H:%M:%S', time.gmtime(b.timestamp)),
+                "Txn Count": len(b.transactions),
+                "Shard": b.shard_id,
+                "Hash": b.hash[:12] + "..."
+            })
+        
+        # Display as a clean, index-less table
+        df_blocks = pd.DataFrame(block_data)
+        st.dataframe(df_blocks, use_container_width=True, hide_index=True)
+
+    with table_col2:
+        st.subheader("📝 Latest Transactions")
+        tx_data = []
+        # Get the latest transactions by iterating backwards through blocks
+        for b in reversed(bc.chain):
+            for tx in reversed(b.transactions):
+                tx_data.append({
+                    "Block": b.index,
+                    "From": tx['sender'][:12] + "..." if len(tx['sender'])>12 else tx['sender'],
+                    "To": tx['recipient'][:12] + "..." if len(tx['recipient'])>12 else tx['recipient'],
+                    "Amount": f"{tx['amount']} AUM"
+                })
+                if len(tx_data) >= 10: # Only show latest 10
+                    break
+            if len(tx_data) >= 10:
+                break
+                
+        df_txs = pd.DataFrame(tx_data)
+        st.dataframe(df_txs, use_container_width=True, hide_index=True)
+
+    st.divider()
+    
+    # --- Search / Inspect Specific Block ---
+    st.subheader("🔎 Inspect Block Details")
+    search_block = st.number_input("Search by Block Number", min_value=0, max_value=len(bc.chain)-1, value=len(bc.chain)-1)
+    
+    selected_block = bc.chain[search_block]
+    
+    st.markdown(f"**Block Height:** `{selected_block.index}`")
+    st.markdown(f"**Timestamp:** `{time.ctime(selected_block.timestamp)}`")
+    st.markdown(f"**Shard ID:** `{selected_block.shard_id}`")
+    st.markdown(f"**Nonce:** `{selected_block.nonce}`")
+    st.markdown(f"**Block Hash:** `{selected_block.hash}`")
+    st.markdown(f"**Parent Hash:** `{selected_block.previous_hash}`")
+    
+    with st.expander("View Raw Transaction Data (JSON)"):
+        st.json(selected_block.transactions)
