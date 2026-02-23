@@ -231,6 +231,18 @@ with tab2:
                 result = bc.mine_block()
                 st.success(result)
                 st.rerun() 
+                
+        if st.button("🛡️ Validate Ledger Integrity"):
+            valid = bc.is_chain_valid()
+            if valid:
+                st.success("✅ Cryptographic validation passed. Chain is secure.")
+            else:
+                st.error("🚨 Warning: Chain data has been tampered with!")
+
+        if st.button("🔄 Reset Network"):
+            st.session_state.blockchain = AUMBlockchain()
+            st.success("Network reset to Genesis Block!")
+            st.rerun() 
 
 # ==========================================
 # TAB 3: AUMscan (EXPLORER)
@@ -266,3 +278,4 @@ with tab3:
                 if len(tx_data) >= 10: break
             if len(tx_data) >= 10: break
         st.dataframe(pd.DataFrame(tx_data), use_container_width=True, hide_index=True)
+
